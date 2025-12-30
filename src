@@ -132,8 +132,41 @@ function library:register_default_commands()
 				self.cmd_bar_frame.PromptLabel.Text = new_prefix
 			end
 			
+			if self.scrolling_frame then
+				self:populate_command_list()
+			end
+			
 			self:notify("Prefix set to " .. new_prefix)
 			if self.auto_config then self:save_config() end
+		else
+			self:notify("Current prefix: " .. self.prefix)
+		end
+	end)
+	
+	self:add_command("bind", "[key]", "Change command bar toggle key", function(key_name)
+		if not key_name or key_name == "" then
+			self:notify("Current bind: " .. self.toggle_key.Name)
+			return
+		end
+		
+		local key = Enum.KeyCode[key_name]
+		
+		if not key then
+			-- Try to find key case-insensitive
+			for _, k in ipairs(Enum.KeyCode:GetEnumItems()) do
+				if k.Name:lower() == key_name:lower() then
+					key = k
+					break
+				end
+			end
+		end
+		
+		if key then
+			self.toggle_key = key
+			self:notify("Bind set to " .. key.Name)
+			if self.auto_config then self:save_config() end
+		else
+			self:notify("Invalid key: " .. key_name)
 		end
 	end)
 	
