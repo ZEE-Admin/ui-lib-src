@@ -143,11 +143,17 @@ function library:register_default_commands()
 		end
 	end)
 	
-	self:add_command("bind", "[key]", "Change command bar toggle key", function(key_name)
+	self:add_command("bind", "[key]", "Change command bar toggle key", function(...)
+		local args = {...}
+		local key_name = table.concat(args, " ")
+		
 		if not key_name or key_name == "" then
 			self:notify("Current bind: " .. self.toggle_key.Name)
 			return
 		end
+		
+		-- Remove quotes if present
+		key_name = key_name:gsub('"', ''):gsub("'", "")
 		
 		local key = Enum.KeyCode[key_name]
 		
@@ -161,10 +167,25 @@ function library:register_default_commands()
 			end
 		end
 		
+		if not key then
+			-- Try to handle common mappings or spaced names (e.g. "Right Control" -> "RightControl")
+			local nospaces = key_name:gsub(" ", "")
+			for _, k in ipairs(Enum.KeyCode:GetEnumItems()) do
+				if k.Name:lower() == nospaces:lower() then
+					key = k
+					break
+				end
+			end
+		end
+		
 		if key then
 			self.toggle_key = key
 			self:notify("Bind set to " .. key.Name)
 			if self.auto_config then self:save_config() end
+			
+			if self.scrolling_frame then
+				self:populate_command_list()
+			end
 		else
 			self:notify("Invalid key: " .. key_name)
 		end
@@ -921,6 +942,10 @@ function library:populate_command_list()
 
 			local placeholder = cmd.args_display
 			placeholder = placeholder:gsub("^%[", ""):gsub("%]$", ""):gsub("^<", ""):gsub(">$", "")
+			
+			if cmd.name == "bind" then
+				placeholder = self.toggle_key.Name
+			end
 			
 			arg_box.Text = ""
 			arg_box.PlaceholderText = placeholder
