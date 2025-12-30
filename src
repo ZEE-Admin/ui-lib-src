@@ -204,7 +204,8 @@ function Library:AddCommand(name, args, desc, callback)
 	if type(args) == "table" then
 		argData = args
 		for _, arg in ipairs(args) do
-			argDisplay = argDisplay .. string.format("<%s> ", arg.Name or arg.Type)
+			local argName = arg.Name or arg.Type
+			argDisplay = argDisplay .. string.format("[%s] ", argName:lower())
 		end
 	else
 		argDisplay = args or ""
@@ -917,30 +918,13 @@ function Library:PopulateCommandList()
 		descLabel.TextXAlignment = Enum.TextXAlignment.Left
 		descLabel.Parent = entry
 		
-		interactBtn.MouseEnter:Connect(function()
-			tween_service:Create(nameLabel, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(100, 255, 100)}):Play()
-		end)
-		interactBtn.MouseLeave:Connect(function()
-			tween_service:Create(nameLabel, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-		end)
-		
 		interactBtn.MouseButton1Click:Connect(function()
-			if cmd.ArgData and #cmd.ArgData > 0 then
-				if self.InputBox then
-					self.InputBox.Text = cmd.Name .. " "
-					self.InputBox:CaptureFocus()
-					
-					if self.Backdrop then self.Backdrop.Visible = true end
-					
-					self:ToggleCommandList(false)
-				end
-			else
-				self:RunCommand(self.Prefix .. cmd.Name)
+			if self.InputBox then
+				self.InputBox.Text = self.Prefix .. cmd.Name .. " "
+				self.InputBox:CaptureFocus()
+				self.InputBox.CursorPosition = #self.InputBox.Text + 1
 				
-				tween_service:Create(nameLabel, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = 0.5 }):Play()
-				task.delay(0.1, function()
-					tween_service:Create(nameLabel, TweenInfo.new(0.2), { TextTransparency = 0.1 }):Play()
-				end)
+				toggleCmdBar(true)
 			end
 		end)
 	end
