@@ -5,132 +5,139 @@ local text_service = game:GetService("TextService")
 local players = game:GetService("Players")
 local lp = players.LocalPlayer
 
-local Library = {}
-Library.__index = Library
-Library.Commands = {}
+local vec2 = Vector2.new
+local dim2 = UDim2.new
+local dim = UDim.new
+local rgb = Color3.fromRGB
+local color = Color3.new
+local rect = Rect.new
 
-function Library.new(name, autoConfig)
-	local self = setmetatable({}, Library)
-	self.Name = name or "UI Lib"
-	self.AutoConfig = autoConfig
-	self.StartTime = tick()
-	self.ScreenGui = nil
-	self.NotificationContainer = nil
-	self.CmdBarFrame = nil
-	self.CommandListHolder = nil
-	self.CommandListFrame = nil
-	self.CLShadow = nil
-	self.CLScale = nil
-	self.ScrollingFrame = nil
-	self.Prefix = ">"
-	self.ToggleKey = Enum.KeyCode.Semicolon
+local library = {}
+library.__index = library
+library.commands = {}
+
+function library.new(name, auto_config)
+	local self = setmetatable({}, library)
+	self.name = name or "UI Lib"
+	self.auto_config = auto_config
+	self.start_time = tick()
+	self.screen_gui = nil
+	self.notification_container = nil
+	self.cmd_bar_frame = nil
+	self.command_list_holder = nil
+	self.command_list_frame = nil
+	self.cl_shadow = nil
+	self.cl_scale = nil
+	self.scrolling_frame = nil
+	self.prefix = ">"
+	self.toggle_key = Enum.KeyCode.Semicolon
 	return self
 end
 
-function Library:Init()
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "ZeeAdminUI"
-	screenGui.ResetOnSpawn = false
-	screenGui.DisplayOrder = 10000
+function library:init()
+	local screen_gui = Instance.new("ScreenGui")
+	screen_gui.Name = "ZeeAdminUI"
+	screen_gui.ResetOnSpawn = false
+	screen_gui.DisplayOrder = 10000
 	
 	pcall(function()
 		if gethui then
-			screenGui.Parent = gethui()
+			screen_gui.Parent = gethui()
 		elseif syn and syn.protect_gui then
-			syn.protect_gui(screenGui)
-			screenGui.Parent = game:GetService("CoreGui")
+			syn.protect_gui(screen_gui)
+			screen_gui.Parent = game:GetService("CoreGui")
 		elseif game:GetService("CoreGui") then
-			screenGui.Parent = game:GetService("CoreGui")
+			screen_gui.Parent = game:GetService("CoreGui")
 		else
-			screenGui.Parent = lp:WaitForChild("PlayerGui")
+			screen_gui.Parent = lp:WaitForChild("PlayerGui")
 		end
 	end)
 	
-	if not screenGui.Parent then
-		screenGui.Parent = lp:WaitForChild("PlayerGui")
+	if not screen_gui.Parent then
+		screen_gui.Parent = lp:WaitForChild("PlayerGui")
 	end
 	
-	self.ScreenGui = screenGui
+	self.screen_gui = screen_gui
 	
-	local NotificationContainer = Instance.new("Frame")
-	NotificationContainer.Name = "NotificationContainer"
-	NotificationContainer.Size = UDim2.new(0, 250, 1, 0)
-	NotificationContainer.Position = UDim2.new(0, 20, 0, 80)
-	NotificationContainer.BackgroundTransparency = 1
-	NotificationContainer.Parent = screenGui
+	local notification_container = Instance.new("Frame")
+	notification_container.Name = "NotificationContainer"
+	notification_container.Size = dim2(0, 250, 1, 0)
+	notification_container.Position = dim2(0, 20, 0, 80)
+	notification_container.BackgroundTransparency = 1
+	notification_container.Parent = screen_gui
 	
-	local NotificationLayout = Instance.new("UIListLayout")
-	NotificationLayout.Parent = NotificationContainer
-	NotificationLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	NotificationLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-	NotificationLayout.Padding = UDim.new(0, 10)
+	local notification_layout = Instance.new("UIListLayout")
+	notification_layout.Parent = notification_container
+	notification_layout.SortOrder = Enum.SortOrder.LayoutOrder
+	notification_layout.VerticalAlignment = Enum.VerticalAlignment.Top
+	notification_layout.Padding = dim(0, 10)
 	
-	self.NotificationContainer = NotificationContainer
+	self.notification_container = notification_container
 
-	if self.AutoConfig then
-		self:LoadConfig()
+	if self.auto_config then
+		self:load_config()
 	end
 	
-	self:RegisterDefaultCommands()
+	self:register_default_commands()
 	
-	local loadTime = tick() - self.StartTime
-	self:Notify(string.format("%s Loaded (%.2fs)", self.Name, loadTime), 5)
+	local load_time = tick() - self.start_time
+	self:notify(string.format("%s Loaded (%.2fs)", self.name, load_time), 5)
 end
 
-function Library:GetConfigPath()
-	return self.Name .. "_config.json"
+function library:get_config_path()
+	return self.name .. "_config.json"
 end
 
-function Library:LoadConfig()
-	if not isfile or not readfile or not isfile(self:GetConfigPath()) then return end
+function library:load_config()
+	if not isfile or not readfile or not isfile(self:get_config_path()) then return end
 	
 	local success, result = pcall(function()
-		return game:GetService("HttpService"):JSONDecode(readfile(self:GetConfigPath()))
+		return game:GetService("HttpService"):JSONDecode(readfile(self:get_config_path()))
 	end)
 	
 	if success and result then
-		if result.Prefix then self.Prefix = result.Prefix end
+		if result.Prefix then self.prefix = result.Prefix end
 		if result.ToggleKey then 
 			local key = Enum.KeyCode[result.ToggleKey]
-			if key then self.ToggleKey = key end
+			if key then self.toggle_key = key end
 		end
 	end
 end
 
-function Library:SaveConfig()
+function library:save_config()
 	if not writefile then return end
 	
 	local data = {
-		Prefix = self.Prefix,
-		ToggleKey = self.ToggleKey.Name
+		Prefix = self.prefix,
+		ToggleKey = self.toggle_key.Name
 	}
 	
 	pcall(function()
-		writefile(self:GetConfigPath(), game:GetService("HttpService"):JSONEncode(data))
+		writefile(self:get_config_path(), game:GetService("HttpService"):JSONEncode(data))
 	end)
 end
 
-function Library:RegisterDefaultCommands()
-	self:AddCommand("cmds", "", "Show command list", function()
-		self:ToggleCommandList(true)
+function library:register_default_commands()
+	self:add_command("cmds", "", "Show command list", function()
+		self:toggle_command_list(true)
 	end)
-	self:AddCommand("commands", "", "Show command list", function()
-		self:ToggleCommandList(true)
+	self:add_command("commands", "", "Show command list", function()
+		self:toggle_command_list(true)
 	end)
 	
-	self:AddCommand("prefix", { {Name = "NewPrefix", Type = "Text"} }, "Change command prefix", function(newPrefix)
-		if newPrefix and newPrefix ~= "" then
-			self.Prefix = newPrefix
-			if self.CmdBarFrame and self.CmdBarFrame:FindFirstChild("PromptLabel") then
-				self.CmdBarFrame.PromptLabel.Text = newPrefix
+	self:add_command("prefix", "[new_prefix]", "Change command prefix", function(new_prefix)
+		if new_prefix and new_prefix ~= "" then
+			self.prefix = new_prefix
+			if self.cmd_bar_frame and self.cmd_bar_frame:FindFirstChild("PromptLabel") then
+				self.cmd_bar_frame.PromptLabel.Text = new_prefix
 			end
 			
-			self:Notify("Prefix set to " .. newPrefix)
-			if self.AutoConfig then self:SaveConfig() end
+			self:notify("Prefix set to " .. new_prefix)
+			if self.auto_config then self:save_config() end
 		end
 	end)
 	
-	self:AddCommand("rejoin", "", "Rejoin the server", function()
+	self:add_command("rejoin", "", "Rejoin the server", function()
 		if #players:GetPlayers() <= 1 then
 			lp:Kick("\nRejoining...")
 			task.wait()
@@ -140,237 +147,159 @@ function Library:RegisterDefaultCommands()
 		end
 	end)
 	
-	self:AddCommand("serverhop", "", "Hop to a different server", function()
-		local Http = game:GetService("HttpService")
-		local TPS = game:GetService("TeleportService")
-		local Api = "https://games.roblox.com/v1/games/"
+	self:add_command("serverhop", "", "Hop to a different server", function()
+		local http = game:GetService("HttpService")
+		local tps = game:GetService("TeleportService")
+		local api = "https://games.roblox.com/v1/games/"
 		
 		local _place = game.PlaceId
-		local _servers = Api.._place.."/servers/Public?sortOrder=Asc&limit=100"
+		local _servers = api.._place.."/servers/Public?sortOrder=Asc&limit=100"
 		
-		local function ListServers(cursor)
-			local Raw = game:HttpGet(_servers .. ((cursor and "&cursor="..cursor) or ""))
-			return Http:JSONDecode(Raw)
+		local function list_servers(cursor)
+			local raw = game:HttpGet(_servers .. ((cursor and "&cursor="..cursor) or ""))
+			return http:JSONDecode(raw)
 		end
 		
-		local Server, Next; repeat
-			local Servers = ListServers(Next)
-			Server = Servers.data[1]
-			Next = Servers.nextPageCursor
-		until Server
+		local server, next_cursor; repeat
+			local servers = list_servers(next_cursor)
+			server = servers.data[1]
+			next_cursor = servers.nextPageCursor
+		until server
 		
-		TPS:TeleportToPlaceInstance(_place, Server.id, lp)
+		tps:TeleportToPlaceInstance(_place, server.id, lp)
 	end)
 	
-	self:AddCommand("cls", "", "Clear client chat/console logs", function()
+	self:add_command("cls", "", "Clear client chat/console logs", function()
 		if game:GetService("TextChatService").ChatVersion == Enum.ChatVersion.TextChatService then
 		elseif game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents") then
 		end
 		print(string.rep("\n", 50))
-		self:Notify("Console/Output cleared (locally)")
+		self:notify("Console/Output cleared (locally)")
 	end)
 end
 
-function Library:GetPlayers(targetStr)
-	local players_list = {}
-	targetStr = targetStr:lower()
+function library:add_command(name, args, desc, callback, aliases)
+	local arg_display = args or ""
 	
-	if targetStr == "all" then
-		for _, v in pairs(players:GetPlayers()) do table.insert(players_list, v) end
-	elseif targetStr == "others" then
-		for _, v in pairs(players:GetPlayers()) do
-			if v ~= lp then table.insert(players_list, v) end
-		end
-	elseif targetStr == "me" then
-		table.insert(players_list, lp)
-	elseif targetStr == "random" then
-		local list = players:GetPlayers()
-		if #list > 0 then table.insert(players_list, list[math.random(1, #list)]) end
-	else
-		for _, v in pairs(players:GetPlayers()) do
-			if v.Name:lower():sub(1, #targetStr) == targetStr or v.DisplayName:lower():sub(1, #targetStr) == targetStr then
-				table.insert(players_list, v)
-			end
-		end
-	end
-	
-	return players_list
-end
-
-function Library:AddCommand(name, args, desc, callback)
-	local argDisplay = ""
-	local argData = {}
-	
-	if type(args) == "table" then
-		argData = args
-		for _, arg in ipairs(args) do
-			local argName = arg.Name or arg.Type
-			argDisplay = argDisplay .. string.format("[%s] ", argName:lower())
-		end
-	else
-		argDisplay = args or ""
-	end
-	
-	local cmdData = {
-		Name = name,
-		ArgsDisplay = argDisplay,
-		ArgData = argData,
-		Desc = desc or "No description provided.",
-		Callback = callback
+	local cmd_data = {
+		name = name,
+		aliases = aliases or {},
+		args_display = arg_display,
+		desc = desc or "No description provided.",
+		callback = callback
 	}
 	
-	table.insert(self.Commands, cmdData)
+	table.insert(self.commands, cmd_data)
 	
-	if self.ScrollingFrame then
-		self:PopulateCommandList()
+	if self.scrolling_frame then
+		self:populate_command_list()
 	end
 end
 
-function Library:RunCommand(input)
-	if input:sub(1, #self.Prefix) ~= self.Prefix then return end
+function library:run_command(input)
+	if input:sub(1, #self.prefix) ~= self.prefix then return end
 	
-	local cleanInput = input:sub(#self.Prefix + 1)
-	local split = cleanInput:split(" ")
-	local cmdName = split[1]:lower()
+	local clean_input = input:sub(#self.prefix + 1)
+	local split = clean_input:split(" ")
+	local cmd_name = split[1]:lower()
 	table.remove(split, 1)
 	
-	local foundCmd
-	for _, cmd in ipairs(self.Commands) do
-		if cmd.Name:lower() == cmdName then
-			foundCmd = cmd
+	local found_cmd
+	for _, cmd in ipairs(self.commands) do
+		if cmd.name:lower() == cmd_name then
+			found_cmd = cmd
 			break
 		end
-	end
-	
-	if foundCmd then
-		local parsedArgs = {}
-		
-		if #foundCmd.ArgData > 0 then
-			for i, argDef in ipairs(foundCmd.ArgData) do
-				local rawArg = split[i]
-				
-				if not rawArg and not argDef.Optional then
-					self:Notify("Missing argument: " .. (argDef.Name or "Unknown"), 3)
-					return
-				end
-				
-				if rawArg then
-					if argDef.Type == "Player" then
-						local targets = self:GetPlayers(rawArg)
-						if #targets == 0 then
-							self:Notify("No matching players found for: " .. rawArg, 3)
-							return
-						end
-						table.insert(parsedArgs, targets)
-					elseif argDef.Type == "Number" then
-						local num = tonumber(rawArg)
-						if not num then
-							self:Notify("Invalid number: " .. rawArg, 3)
-							return
-						end
-						table.insert(parsedArgs, num)
-					else
-						if i == #foundCmd.ArgData and argDef.Type == "Text" then
-							local rest = table.concat(split, " ", i)
-							table.insert(parsedArgs, rest)
-						else
-							table.insert(parsedArgs, rawArg)
-						end
-					end
-				else
-					table.insert(parsedArgs, nil)
+		if cmd.aliases then
+			for _, alias in ipairs(cmd.aliases) do
+				if alias:lower() == cmd_name then
+					found_cmd = cmd
+					break
 				end
 			end
-			
-			task.spawn(function()
-				local success, err = pcall(function()
-					foundCmd.Callback(unpack(parsedArgs))
-				end)
-				if not success then
-					warn("Command Error:", err)
-					self:Notify("Error: " .. tostring(err), 5)
-				end
-			end)
-		else
-			task.spawn(function()
-				local success, err = pcall(function()
-					foundCmd.Callback(unpack(split))
-				end)
-				if not success then
-					warn("Command Error:", err)
-					self:Notify("Error: " .. tostring(err), 5)
-				end
-			end)
 		end
+		if found_cmd then break end
+	end
+	
+	if found_cmd then
+		task.spawn(function()
+			local success, err = pcall(function()
+				found_cmd.callback(unpack(split))
+			end)
+			if not success then
+				warn("Command Error:", err)
+				self:notify("Error: " .. tostring(err), 5)
+			end
+		end)
 	else
-		self:Notify("Command not found: " .. cmdName, 2)
+		self:notify("Command not found: " .. cmd_name, 2)
 	end
 end
 
-function Library:Notify(text, duration)
-	if not self.NotificationContainer then return end
+function library:notify(text, duration)
+	if not self.notification_container then return end
 	duration = duration or 3
 	
-	local Holder = Instance.new("Frame")
-	Holder.BackgroundTransparency = 1
-	Holder.Size = UDim2.new(1, 0, 0, 40)
-	Holder.Parent = self.NotificationContainer
+	local holder = Instance.new("Frame")
+	holder.BackgroundTransparency = 1
+	holder.Size = dim2(1, 0, 0, 40)
+	holder.Parent = self.notification_container
 	
-	local Inner = Instance.new("Frame")
-	Inner.Size = UDim2.new(1, 0, 1, 0)
-	Inner.Position = UDim2.new(-1.2, 0, 0, 0)
-	Inner.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-	Inner.BackgroundTransparency = 0.15
-	Inner.BorderSizePixel = 0
-	Inner.Parent = Holder
+	local inner = Instance.new("Frame")
+	inner.Size = dim2(1, 0, 1, 0)
+	inner.Position = dim2(-1.2, 0, 0, 0)
+	inner.BackgroundColor3 = rgb(45, 45, 45)
+	inner.BackgroundTransparency = 0.15
+	inner.BorderSizePixel = 0
+	inner.Parent = holder
 	
-	local UICorner = Instance.new("UICorner")
-	UICorner.CornerRadius = UDim.new(0, 6)
-	UICorner.Parent = Inner
+	local ui_corner = Instance.new("UICorner")
+	ui_corner.CornerRadius = dim(0, 6)
+	ui_corner.Parent = inner
 	
-	local UIStroke = Instance.new("UIStroke")
-	UIStroke.Color = Color3.fromRGB(255, 255, 255)
-	UIStroke.Transparency = 0.85
-	UIStroke.Thickness = 1
-	UIStroke.Parent = Inner
+	local ui_stroke = Instance.new("UIStroke")
+	ui_stroke.Color = rgb(255, 255, 255)
+	ui_stroke.Transparency = 0.85
+	ui_stroke.Thickness = 1
+	ui_stroke.Parent = inner
 	
-	local Shadow = Instance.new("ImageLabel")
-	Shadow.Name = "Shadow"
-	Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-	Shadow.Position = UDim2.fromScale(0.5, 0.5)
-	Shadow.Size = UDim2.new(1, 10, 1, 10)
-	Shadow.BackgroundTransparency = 1
-	Shadow.Image = "rbxassetid://1316045217"
-	Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-	Shadow.ImageTransparency = 0.6
-	Shadow.SliceCenter = Rect.new(10, 10, 118, 118)
-	Shadow.ScaleType = Enum.ScaleType.Slice
-	Shadow.ZIndex = 0
-	Shadow.Parent = Inner
+	local shadow = Instance.new("ImageLabel")
+	shadow.Name = "Shadow"
+	shadow.AnchorPoint = vec2(0.5, 0.5)
+	shadow.Position = UDim2.fromScale(0.5, 0.5)
+	shadow.Size = dim2(1, 10, 1, 10)
+	shadow.BackgroundTransparency = 1
+	shadow.Image = "rbxassetid://1316045217"
+	shadow.ImageColor3 = rgb(0, 0, 0)
+	shadow.ImageTransparency = 0.6
+	shadow.SliceCenter = rect(10, 10, 118, 118)
+	shadow.ScaleType = Enum.ScaleType.Slice
+	shadow.ZIndex = 0
+	shadow.Parent = inner
 	
-	local Bar = Instance.new("Frame")
-	Bar.Name = "AccentBar"
-	Bar.Size = UDim2.new(0, 3, 0.6, 0)
-	Bar.Position = UDim2.new(0, 6, 0.2, 0)
-	Bar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	Bar.BorderSizePixel = 0
-	Bar.Parent = Inner
+	local bar = Instance.new("Frame")
+	bar.Name = "AccentBar"
+	bar.Size = dim2(0, 3, 0.6, 0)
+	bar.Position = dim2(0, 6, 0.2, 0)
+	bar.BackgroundColor3 = rgb(255, 255, 255)
+	bar.BorderSizePixel = 0
+	bar.Parent = inner
 	
-	local BarCorner = Instance.new("UICorner")
-	BarCorner.CornerRadius = UDim.new(1, 0)
-	BarCorner.Parent = Bar
+	local bar_corner = Instance.new("UICorner")
+	bar_corner.CornerRadius = dim(1, 0)
+	bar_corner.Parent = bar
 	
-	local Label = Instance.new("TextLabel")
-	Label.Size = UDim2.new(1, -25, 1, 0)
-	Label.Position = UDim2.new(0, 16, 0, 0)
-	Label.BackgroundTransparency = 1
-	Label.Text = text
-	Label.TextColor3 = Color3.fromRGB(240, 240, 240)
-	Label.TextSize = 14
-	Label.Font = Enum.Font.GothamMedium
-	Label.TextXAlignment = Enum.TextXAlignment.Left
-	Label.RichText = true
-	Label.Parent = Inner
+	local label = Instance.new("TextLabel")
+	label.Size = dim2(1, -25, 1, 0)
+	label.Position = dim2(0, 16, 0, 0)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = rgb(240, 240, 240)
+	label.TextSize = 14
+	label.Font = Enum.Font.GothamMedium
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.RichText = true
+	label.Parent = inner
 	
 	local subject, status = text:match("^(.*)%s+(Enabled)$")
 	if not subject then subject, status = text:match("^(.*)%s+(Disabled)$") end
@@ -378,306 +307,256 @@ function Library:Notify(text, duration)
 	if not subject then subject, status = text:match("^(.*)%s+(Disallowed)$") end
 	
 	if subject and status then
-		local isGreen = (status == "Enabled" or status == "Allowed")
-		local colorHex = isGreen and "#64ff64" or "#ff6464"
-		Label.Text = string.format("<b>%s</b> <font color='%s'>%s</font>", subject, colorHex, status)
-		Bar.BackgroundColor3 = isGreen and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+		local is_green = (status == "Enabled" or status == "Allowed")
+		local color_hex = is_green and "#64ff64" or "#ff6464"
+		label.Text = string.format("<b>%s</b> <font color='%s'>%s</font>", subject, color_hex, status)
+		bar.BackgroundColor3 = is_green and rgb(100, 255, 100) or rgb(255, 100, 100)
 	else
 		if text:lower():find("target") or text:lower():find("kill") or text:lower():find("stomp") then
-			Bar.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
+			bar.BackgroundColor3 = rgb(255, 150, 50)
 		elseif text:lower():find("set to") then
-			Bar.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+			bar.BackgroundColor3 = rgb(100, 200, 255)
 		end
 	end
 	
-	tween_service:Create(Inner, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0, 0, 0, 0)
+	tween_service:Create(inner, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+		Position = dim2(0, 0, 0, 0)
 	}):Play()
 	
 	task.delay(duration, function()
-		if not Inner.Parent then return end
-		local tween = tween_service:Create(Inner, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
-			Position = UDim2.new(-1.2, 0, 0, 0)
+		if not inner.Parent then return end
+		local tween = tween_service:Create(inner, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+			Position = dim2(-1.2, 0, 0, 0)
 		})
 		tween:Play()
 		tween.Completed:Wait()
-		Holder:Destroy()
+		holder:Destroy()
 	end)
 end
 
-function Library:CreateCommandBar(prefix)
-	if self.Prefix == ">" and prefix then
-		self.Prefix = prefix
+function library:create_command_bar(prefix)
+	if self.prefix == ">" and prefix then
+		self.prefix = prefix
 	end
 	
-	local Backdrop = Instance.new("Frame")
-	Backdrop.Name = "Backdrop"
-	Backdrop.Size = UDim2.new(1, 0, 1, 0)
-	Backdrop.BackgroundColor3 = Color3.new(0, 0, 0)
-	Backdrop.BackgroundTransparency = 1
-	Backdrop.Visible = false
-	Backdrop.Parent = self.ScreenGui
+	local backdrop = Instance.new("Frame")
+	backdrop.Name = "Backdrop"
+	backdrop.Size = dim2(1, 0, 1, 0)
+	backdrop.BackgroundColor3 = color(0, 0, 0)
+	backdrop.BackgroundTransparency = 1
+	backdrop.Visible = false
+	backdrop.Parent = self.screen_gui
 	
-	local CmdBarFrame = Instance.new("Frame")
-	CmdBarFrame.Name = "CmdBarFrame"
-	CmdBarFrame.Size = UDim2.new(0, 250, 0, 35)
-	CmdBarFrame.AnchorPoint = Vector2.new(0.5, 0)
-	CmdBarFrame.Position = UDim2.new(0.5, 0, 0.95, -46) 
-	CmdBarFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-	CmdBarFrame.BorderSizePixel = 0
-	CmdBarFrame.BackgroundTransparency = 1
-	CmdBarFrame.Parent = Backdrop
+	local cmd_bar_frame = Instance.new("Frame")
+	cmd_bar_frame.Name = "CmdBarFrame"
+	cmd_bar_frame.Size = dim2(0, 250, 0, 35)
+	cmd_bar_frame.AnchorPoint = vec2(0.5, 0)
+	cmd_bar_frame.Position = dim2(0.5, 0, 0.95, -46) 
+	cmd_bar_frame.BackgroundColor3 = rgb(45, 45, 45)
+	cmd_bar_frame.BorderSizePixel = 0
+	cmd_bar_frame.BackgroundTransparency = 1
+	cmd_bar_frame.Parent = backdrop
 	
-	local Shadow = Instance.new("ImageLabel")
-	Shadow.Name = "Shadow"
-	Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-	Shadow.Position = UDim2.fromScale(0.5, 0.5)
-	Shadow.Size = UDim2.new(1, 10, 1, 10)
-	Shadow.BackgroundTransparency = 1
-	Shadow.Image = "rbxassetid://1316045217"
-	Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-	Shadow.ImageTransparency = 1
-	Shadow.ScaleType = Enum.ScaleType.Slice
-	Shadow.SliceCenter = Rect.new(10, 10, 118, 118)
-	Shadow.ZIndex = CmdBarFrame.ZIndex - 1
-	Shadow.Parent = CmdBarFrame
+	local shadow = Instance.new("ImageLabel")
+	shadow.Name = "Shadow"
+	shadow.AnchorPoint = vec2(0.5, 0.5)
+	shadow.Position = UDim2.fromScale(0.5, 0.5)
+	shadow.Size = dim2(1, 10, 1, 10)
+	shadow.BackgroundTransparency = 1
+	shadow.Image = "rbxassetid://1316045217"
+	shadow.ImageColor3 = rgb(0, 0, 0)
+	shadow.ImageTransparency = 1
+	shadow.ScaleType = Enum.ScaleType.Slice
+	shadow.SliceCenter = rect(10, 10, 118, 118)
+	shadow.ZIndex = cmd_bar_frame.ZIndex - 1
+	shadow.Parent = cmd_bar_frame
 	
-	local UICorner = Instance.new("UICorner")
-	UICorner.CornerRadius = UDim.new(0, 6)
-	UICorner.Parent = CmdBarFrame
+	local ui_corner = Instance.new("UICorner")
+	ui_corner.CornerRadius = dim(0, 6)
+	ui_corner.Parent = cmd_bar_frame
 	
-	local UIStroke = Instance.new("UIStroke")
-	UIStroke.Color = Color3.fromRGB(80, 80, 80)
-	UIStroke.Thickness = 1
-	UIStroke.Transparency = 1
-	UIStroke.Parent = CmdBarFrame
+	local ui_stroke = Instance.new("UIStroke")
+	ui_stroke.Color = rgb(80, 80, 80)
+	ui_stroke.Thickness = 1
+	ui_stroke.Transparency = 1
+	ui_stroke.Parent = cmd_bar_frame
 	
-	local PromptLabel = Instance.new("TextLabel")
-	PromptLabel.Name = "PromptLabel"
-	PromptLabel.Size = UDim2.new(0, 20, 1, 0)
-	PromptLabel.Position = UDim2.new(0, 10, 0, 0)
-	PromptLabel.BackgroundTransparency = 1
-	PromptLabel.Text = self.Prefix
-	PromptLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-	PromptLabel.TextSize = 18
-	PromptLabel.Font = Enum.Font.SourceSans
-	PromptLabel.TextXAlignment = Enum.TextXAlignment.Center
-	PromptLabel.Parent = CmdBarFrame
+	local prompt_label = Instance.new("TextLabel")
+	prompt_label.Name = "PromptLabel"
+	prompt_label.Size = dim2(0, 20, 1, 0)
+	prompt_label.Position = dim2(0, 10, 0, 0)
+	prompt_label.BackgroundTransparency = 1
+	prompt_label.Text = self.prefix
+	prompt_label.TextColor3 = rgb(150, 150, 150)
+	prompt_label.TextSize = 18
+	prompt_label.Font = Enum.Font.SourceSans
+	prompt_label.TextXAlignment = Enum.TextXAlignment.Center
+	prompt_label.Parent = cmd_bar_frame
 	
-	local SuggestionLabel = Instance.new("TextLabel")
-	SuggestionLabel.Name = "SuggestionLabel"
-	SuggestionLabel.Size = UDim2.new(1, -40, 1, 0)
-	SuggestionLabel.Position = UDim2.new(0, 35, 0, 0)
-	SuggestionLabel.BackgroundTransparency = 1
-	SuggestionLabel.Text = ""
-	SuggestionLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-	SuggestionLabel.TextTransparency = 0.5
-	SuggestionLabel.TextSize = 18
-	SuggestionLabel.RichText = false
-	SuggestionLabel.Font = Enum.Font.SourceSans
-	SuggestionLabel.TextXAlignment = Enum.TextXAlignment.Left
-	SuggestionLabel.Parent = CmdBarFrame
+	local suggestion_label = Instance.new("TextLabel")
+	suggestion_label.Name = "SuggestionLabel"
+	suggestion_label.Size = dim2(1, -40, 1, 0)
+	suggestion_label.Position = dim2(0, 35, 0, 0)
+	suggestion_label.BackgroundTransparency = 1
+	suggestion_label.Text = ""
+	suggestion_label.TextColor3 = rgb(200, 200, 200)
+	suggestion_label.TextTransparency = 0.5
+	suggestion_label.TextSize = 18
+	suggestion_label.RichText = false
+	suggestion_label.Font = Enum.Font.SourceSans
+	suggestion_label.TextXAlignment = Enum.TextXAlignment.Left
+	suggestion_label.Parent = cmd_bar_frame
 	
-	local InputBox = Instance.new("TextBox")
-	InputBox.Name = "InputBox"
-	InputBox.Size = UDim2.new(1, -40, 1, 0)
-	InputBox.Position = UDim2.new(0, 35, 0, 0)
-	InputBox.BackgroundTransparency = 1
-	InputBox.Text = ""
-	InputBox.PlaceholderText = ""
-	InputBox.TextColor3 = Color3.fromRGB(200, 200, 200)
-	InputBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
-	InputBox.TextSize = 18
-	InputBox.Font = Enum.Font.SourceSans
-	InputBox.TextXAlignment = Enum.TextXAlignment.Left
-	InputBox.ClearTextOnFocus = false
-	InputBox.Parent = CmdBarFrame
+	local input_box = Instance.new("TextBox")
+	input_box.Name = "InputBox"
+	input_box.Size = dim2(1, -40, 1, 0)
+	input_box.Position = dim2(0, 35, 0, 0)
+	input_box.BackgroundTransparency = 1
+	input_box.Text = ""
+	input_box.PlaceholderText = ""
+	input_box.TextColor3 = rgb(200, 200, 200)
+	input_box.PlaceholderColor3 = rgb(100, 100, 100)
+	input_box.TextSize = 18
+	input_box.Font = Enum.Font.SourceSans
+	input_box.TextXAlignment = Enum.TextXAlignment.Left
+	input_box.ClearTextOnFocus = false
+	input_box.Parent = cmd_bar_frame
 	
-	self.CmdBarFrame = CmdBarFrame
-	self.Backdrop = Backdrop
-	self.InputBox = InputBox
-	self.SuggestionLabel = SuggestionLabel
+	self.cmd_bar_frame = cmd_bar_frame
+	self.backdrop = backdrop
+	self.input_box = input_box
+	self.suggestion_label = suggestion_label
 	
-	local currentMatch = nil
-	local currentSuggestionFull = ""
-	local isVisible = false
+	local current_match = nil
+	local current_suggestion_full = ""
+	local is_visible = false
 	
-	local function toggleCmdBar(state)
-		if state ~= nil then isVisible = state else isVisible = not isVisible end
+	local function toggle_cmd_bar(state)
+		if state ~= nil then is_visible = state else is_visible = not is_visible end
 		
-		if isVisible then
-			Backdrop.Visible = true
-			CmdBarFrame.Visible = true
+		if is_visible then
+			backdrop.Visible = true
+			cmd_bar_frame.Visible = true
 			
-			tween_service:Create(CmdBarFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			tween_service:Create(cmd_bar_frame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 				BackgroundTransparency = 0.15,
-				Position = UDim2.new(0.5, 0, 0.92, -46)
+				Position = dim2(0.5, 0, 0.92, -46)
 			}):Play()
-			tween_service:Create(Shadow, TweenInfo.new(0.3), {ImageTransparency = 0.8}):Play()
-			tween_service:Create(UIStroke, TweenInfo.new(0.3), {Transparency = 0}):Play()
+			tween_service:Create(shadow, TweenInfo.new(0.3), {ImageTransparency = 0.8}):Play()
+			tween_service:Create(ui_stroke, TweenInfo.new(0.3), {Transparency = 0}):Play()
 			
 			task.delay(0.1, function()
-				if isVisible then
-					InputBox.Text = ""
-					InputBox:CaptureFocus()
+				if is_visible then
+					input_box.Text = ""
+					input_box:CaptureFocus()
 				end
 			end)
 		else
-			tween_service:Create(CmdBarFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+			tween_service:Create(cmd_bar_frame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
 				BackgroundTransparency = 1,
-				Position = UDim2.new(0.5, 0, 0.95, -46)
+				Position = dim2(0.5, 0, 0.95, -46)
 			}):Play()
-			tween_service:Create(Shadow, TweenInfo.new(0.2), {ImageTransparency = 1}):Play()
-			tween_service:Create(UIStroke, TweenInfo.new(0.2), {Transparency = 1}):Play()
+			tween_service:Create(shadow, TweenInfo.new(0.2), {ImageTransparency = 1}):Play()
+			tween_service:Create(ui_stroke, TweenInfo.new(0.2), {Transparency = 1}):Play()
 			
-			InputBox.Text = ""
-			SuggestionLabel.Text = ""
-			InputBox:ReleaseFocus()
+			input_box.Text = ""
+			suggestion_label.Text = ""
+			input_box:ReleaseFocus()
 			
 			task.delay(0.2, function()
-				if not isVisible then
-					Backdrop.Visible = false
+				if not is_visible then
+					backdrop.Visible = false
 				end
 			end)
 		end
 	end
 	
-	local function updateSuggestion()
-		local text = InputBox.Text
+	local function update_suggestion()
+		local text = input_box.Text
 		
 		if text:find("\t") then
 			text = text:gsub("\t", "")
-			InputBox.Text = text
-			InputBox.CursorPosition = #text + 1
+			input_box.Text = text
+			input_box.CursorPosition = #text + 1
 		end
 		
-		SuggestionLabel.Text = ""
-		currentMatch = nil
-		currentSuggestionFull = ""
+		suggestion_label.Text = ""
+		current_match = nil
+		current_suggestion_full = ""
 		
 		if text == "" then return end
 		
-		local cleanText = text
-		if cleanText:sub(1, #self.Prefix) == self.Prefix then
-			cleanText = cleanText:sub(#self.Prefix + 1)
+		local clean_text = text
+		if clean_text:sub(1, #self.prefix) == self.prefix then
+			clean_text = clean_text:sub(#self.prefix + 1)
 		end
 		
-		if cleanText == "" then return end
+		if clean_text == "" then return end
 		
-		local args = cleanText:split(" ")
-		local cmdPart = args[1]:lower()
+		local args = clean_text:split(" ")
+		local cmd_part = args[1]:lower()
 		
 		if #args == 1 then
-			for _, cmdData in ipairs(self.Commands) do
-				if cmdData.Name:lower():sub(1, #cmdPart) == cmdPart then
-					currentMatch = cmdData.Name
-					local suffix = cmdData.Name:sub(#cmdPart + 1)
-					currentSuggestionFull = text .. suffix
+			for _, cmd_data in ipairs(self.commands) do
+				if cmd_data.name:lower():sub(1, #cmd_part) == cmd_part then
+					current_match = cmd_data.name
+					local suffix = cmd_data.name:sub(#cmd_part + 1)
+					current_suggestion_full = text .. suffix
 					
-					local measureText = text:gsub(" ", "\194\160")
-					local size = text_service:GetTextSize(measureText, InputBox.TextSize, InputBox.Font, Vector2.new(10000, 100))
+					local measure_text = text:gsub(" ", "\194\160")
+					local size = text_service:GetTextSize(measure_text, input_box.TextSize, input_box.Font, vec2(10000, 100))
 					
-					SuggestionLabel.Text = suffix
-					SuggestionLabel.Position = UDim2.new(0, 35 + size.X, 0, 0)
+					suggestion_label.Text = suffix
+					suggestion_label.Position = dim2(0, 35 + size.X, 0, 0)
 					return
 				end
 			end
 		end
-		
-		if #args >= 2 then
-			local foundCmd = nil
-			for _, cmdData in ipairs(self.Commands) do
-				if cmdData.Name:lower() == cmdPart then
-					foundCmd = cmdData
-					break
-				end
-			end
-			
-			if foundCmd and foundCmd.ArgData then
-				local argIndex = #args - 1
-				local argDef = foundCmd.ArgData[argIndex] or foundCmd.ArgData[#foundCmd.ArgData] 
-				
-				if argDef and argDef.Type == "Player" then
-					local partialName = args[#args]
-					if partialName == "" then return end
-					
-					local bestMatch = nil
-					local matchText = nil
-					
-					for _, player in ipairs(players:GetPlayers()) do
-						if player ~= lp then
-							if player.DisplayName:lower():sub(1, #partialName) == partialName:lower() then
-								bestMatch = player
-								matchText = player.DisplayName
-								break
-							end
-							if player.Name:lower():sub(1, #partialName) == partialName:lower() then
-								bestMatch = player
-								matchText = player.Name
-								break
-							end
-						end
-					end
-					
-					if bestMatch then
-						currentMatch = matchText
-						local suffix = matchText:sub(#partialName + 1)
-						currentSuggestionFull = text .. suffix
-						
-						local measureText = text:gsub(" ", "\194\160")
-						local size = text_service:GetTextSize(measureText, InputBox.TextSize, InputBox.Font, Vector2.new(10000, 100))
-						
-						SuggestionLabel.Text = suffix
-						SuggestionLabel.Position = UDim2.new(0, 35 + size.X, 0, 0)
-					end
-				end
-			end
-		end
 	end
 	
-	InputBox:GetPropertyChangedSignal("Text"):Connect(updateSuggestion)
+	input_box:GetPropertyChangedSignal("Text"):Connect(update_suggestion)
 	
-	InputBox.FocusLost:Connect(function(enterPressed)
-		if enterPressed then
-			local text = InputBox.Text
+	input_box.FocusLost:Connect(function(enter_pressed)
+		if enter_pressed then
+			local text = input_box.Text
 			if text ~= "" then
-				self:RunCommand(self.Prefix .. text)
-				InputBox.Text = ""
-				toggleCmdBar(false)
+				self:run_command(self.prefix .. text)
+				input_box.Text = ""
+				toggle_cmd_bar(false)
 			end
 		end
 	end)
 	
 	uis.InputBegan:Connect(function(input, gpe)
-		if input.KeyCode == self.ToggleKey and not gpe then
-			toggleCmdBar()
-		elseif isVisible and input.KeyCode == Enum.KeyCode.Tab then
-			if currentMatch and currentSuggestionFull ~= "" then
-				InputBox.Text = currentSuggestionFull
-				InputBox.CursorPosition = #InputBox.Text + 1
-				updateSuggestion()
-				task.defer(function() InputBox:CaptureFocus() end)
+		if input.KeyCode == self.toggle_key and not gpe then
+			toggle_cmd_bar()
+		elseif is_visible and input.KeyCode == Enum.KeyCode.Tab then
+			if current_match and current_suggestion_full ~= "" then
+				input_box.Text = current_suggestion_full
+				input_box.CursorPosition = #input_box.Text + 1
+				update_suggestion()
+				task.defer(function() input_box:CaptureFocus() end)
 			end
 		end
 	end)
 	
-	return InputBox, Backdrop
+	return input_box, backdrop
 end
 
-function Library:MakeDraggable(gui)
+function library:make_draggable(gui)
 	local dragging
-	local dragInput
-	local dragStart
-	local startPos
+	local drag_input
+	local drag_start
+	local start_pos
 	
 	gui:SetAttribute("TargetPos", gui.Position)
 
 	gui.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
-			dragStart = input.Position
-			startPos = gui.Position
-			gui:SetAttribute("TargetPos", startPos)
+			drag_start = input.Position
+			start_pos = gui.Position
+			gui:SetAttribute("TargetPos", start_pos)
 			
 			input.Changed:Connect(function()
 				if input.UserInputState == Enum.UserInputState.End then
@@ -689,14 +568,14 @@ function Library:MakeDraggable(gui)
 	
 	gui.InputChanged:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
+			drag_input = input
 		end
 	end)
 	
 	uis.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			local delta = input.Position - dragStart
-			local target = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		if input == drag_input and dragging then
+			local delta = input.Position - drag_start
+			local target = dim2(start_pos.X.Scale, start_pos.X.Offset + delta.X, start_pos.Y.Scale, start_pos.Y.Offset + delta.Y)
 			gui:SetAttribute("TargetPos", target)
 		end
 	end)
@@ -712,143 +591,143 @@ function Library:MakeDraggable(gui)
 	end)
 end
 
-function Library:CreateCommandList()
-	local CommandListHolder = Instance.new("Frame")
-	CommandListHolder.Name = "CommandListHolder"
-	CommandListHolder.Size = UDim2.new(0, 400, 0, 320)
-	CommandListHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
-	CommandListHolder.AnchorPoint = Vector2.new(0.5, 0.5)
-	CommandListHolder.BackgroundTransparency = 1
-	CommandListHolder.Visible = false
-	CommandListHolder.Parent = self.ScreenGui
+function library:create_command_list()
+	local command_list_holder = Instance.new("Frame")
+	command_list_holder.Name = "CommandListHolder"
+	command_list_holder.Size = dim2(0, 400, 0, 320)
+	command_list_holder.Position = dim2(0.5, 0, 0.5, 0)
+	command_list_holder.AnchorPoint = vec2(0.5, 0.5)
+	command_list_holder.BackgroundTransparency = 1
+	command_list_holder.Visible = false
+	command_list_holder.Parent = self.screen_gui
 	
-	self:MakeDraggable(CommandListHolder)
+	self:make_draggable(command_list_holder)
 	
-	local CLShadow = Instance.new("ImageLabel")
-	CLShadow.Name = "Shadow"
-	CLShadow.AnchorPoint = Vector2.new(0.5, 0.5)
-	CLShadow.Position = UDim2.fromScale(0.5, 0.5)
-	CLShadow.Size = UDim2.new(1, 10, 1, 10)
-	CLShadow.BackgroundTransparency = 1
-	CLShadow.Image = "rbxassetid://1316045217"
-	CLShadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-	CLShadow.ImageTransparency = 1
-	CLShadow.ScaleType = Enum.ScaleType.Slice
-	CLShadow.SliceCenter = Rect.new(10, 10, 118, 118)
-	CLShadow.ZIndex = 0
-	CLShadow.Parent = CommandListHolder
+	local cl_shadow = Instance.new("ImageLabel")
+	cl_shadow.Name = "Shadow"
+	cl_shadow.AnchorPoint = vec2(0.5, 0.5)
+	cl_shadow.Position = UDim2.fromScale(0.5, 0.5)
+	cl_shadow.Size = dim2(1, 10, 1, 10)
+	cl_shadow.BackgroundTransparency = 1
+	cl_shadow.Image = "rbxassetid://1316045217"
+	cl_shadow.ImageColor3 = rgb(0, 0, 0)
+	cl_shadow.ImageTransparency = 1
+	cl_shadow.ScaleType = Enum.ScaleType.Slice
+	cl_shadow.SliceCenter = rect(10, 10, 118, 118)
+	cl_shadow.ZIndex = 0
+	cl_shadow.Parent = command_list_holder
 	
-	local CommandListFrame = Instance.new("CanvasGroup")
-	CommandListFrame.Name = "CommandListFrame"
-	CommandListFrame.Size = UDim2.new(1, 0, 1, 0)
-	CommandListFrame.Position = UDim2.new(0, 0, 0, 0)
-	CommandListFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-	CommandListFrame.BackgroundTransparency = 0.15
-	CommandListFrame.BorderSizePixel = 0
-	CommandListFrame.GroupTransparency = 1
-	CommandListFrame.Parent = CommandListHolder
+	local command_list_frame = Instance.new("CanvasGroup")
+	command_list_frame.Name = "CommandListFrame"
+	command_list_frame.Size = dim2(1, 0, 1, 0)
+	command_list_frame.Position = dim2(0, 0, 0, 0)
+	command_list_frame.BackgroundColor3 = rgb(45, 45, 45)
+	command_list_frame.BackgroundTransparency = 0.15
+	command_list_frame.BorderSizePixel = 0
+	command_list_frame.GroupTransparency = 1
+	command_list_frame.Parent = command_list_holder
 	
-	local CLScale = Instance.new("UIScale")
-	CLScale.Parent = CommandListFrame
+	local cl_scale = Instance.new("UIScale")
+	cl_scale.Parent = command_list_frame
 	
-	local CLCorner = Instance.new("UICorner")
-	CLCorner.CornerRadius = UDim.new(0, 12)
-	CLCorner.Parent = CommandListFrame
+	local cl_corner = Instance.new("UICorner")
+	cl_corner.CornerRadius = dim(0, 12)
+	cl_corner.Parent = command_list_frame
 	
-	local CLStroke = Instance.new("UIStroke")
-	CLStroke.Color = Color3.fromRGB(80, 80, 80)
-	CLStroke.Thickness = 1
-	CLStroke.Parent = CommandListFrame
+	local cl_stroke = Instance.new("UIStroke")
+	cl_stroke.Color = rgb(80, 80, 80)
+	cl_stroke.Thickness = 1
+	cl_stroke.Parent = command_list_frame
 	
-	local CLTitle = Instance.new("TextLabel")
-	CLTitle.Size = UDim2.new(1, -40, 0, 30)
-	CLTitle.Position = UDim2.new(0, 10, 0, 5)
-	CLTitle.BackgroundTransparency = 1
-	CLTitle.Text = "Commands"
-	CLTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-	CLTitle.TextTransparency = 0.3
-	CLTitle.TextSize = 20
-	CLTitle.Font = Enum.Font.GothamSemibold
-	CLTitle.TextXAlignment = Enum.TextXAlignment.Left
-	CLTitle.Parent = CommandListFrame
+	local cl_title = Instance.new("TextLabel")
+	cl_title.Size = dim2(1, -40, 0, 30)
+	cl_title.Position = dim2(0, 10, 0, 5)
+	cl_title.BackgroundTransparency = 1
+	cl_title.Text = "Commands"
+	cl_title.TextColor3 = rgb(255, 255, 255)
+	cl_title.TextTransparency = 0.3
+	cl_title.TextSize = 20
+	cl_title.Font = Enum.Font.GothamSemibold
+	cl_title.TextXAlignment = Enum.TextXAlignment.Left
+	cl_title.Parent = command_list_frame
 	
-	local CLClose = Instance.new("TextButton")
-	CLClose.Size = UDim2.new(0, 20, 0, 20)
-	CLClose.Position = UDim2.new(1, -25, 0, 8)
-	CLClose.BackgroundTransparency = 1
-	CLClose.Text = "X"
-	CLClose.TextColor3 = Color3.fromRGB(200, 200, 200)
-	CLClose.TextSize = 14
-	CLClose.Font = Enum.Font.Gotham
-	CLClose.Parent = CommandListFrame
+	local cl_close = Instance.new("TextButton")
+	cl_close.Size = dim2(0, 20, 0, 20)
+	cl_close.Position = dim2(1, -25, 0, 8)
+	cl_close.BackgroundTransparency = 1
+	cl_close.Text = "X"
+	cl_close.TextColor3 = rgb(200, 200, 200)
+	cl_close.TextSize = 14
+	cl_close.Font = Enum.Font.Gotham
+	cl_close.Parent = command_list_frame
 	
-	CLClose.MouseButton1Click:Connect(function()
-		self:ToggleCommandList(false)
+	cl_close.MouseButton1Click:Connect(function()
+		self:toggle_command_list(false)
 	end)
 	
-	local ScrollingFrame = Instance.new("ScrollingFrame")
-	ScrollingFrame.Size = UDim2.new(1, -20, 1, -50)
-	ScrollingFrame.Position = UDim2.new(0, 10, 0, 40)
-	ScrollingFrame.BackgroundTransparency = 1
-	ScrollingFrame.BorderSizePixel = 0
-	ScrollingFrame.ScrollBarThickness = 4
-	ScrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
-	ScrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-	ScrollingFrame.Parent = CommandListFrame
+	local scrolling_frame = Instance.new("ScrollingFrame")
+	scrolling_frame.Size = dim2(1, -20, 1, -50)
+	scrolling_frame.Position = dim2(0, 10, 0, 40)
+	scrolling_frame.BackgroundTransparency = 1
+	scrolling_frame.BorderSizePixel = 0
+	scrolling_frame.ScrollBarThickness = 4
+	scrolling_frame.ScrollBarImageColor3 = rgb(80, 80, 80)
+	scrolling_frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scrolling_frame.CanvasSize = dim2(0, 0, 0, 0)
+	scrolling_frame.Parent = command_list_frame
 	
-	local UIListLayout = Instance.new("UIListLayout")
-	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	UIListLayout.Padding = UDim.new(0, 5)
-	UIListLayout.Parent = ScrollingFrame
+	local ui_list_layout = Instance.new("UIListLayout")
+	ui_list_layout.SortOrder = Enum.SortOrder.LayoutOrder
+	ui_list_layout.Padding = dim(0, 5)
+	ui_list_layout.Parent = scrolling_frame
 	
-	local UIPadding = Instance.new("UIPadding")
-	UIPadding.PaddingTop = UDim.new(0, 5)
-	UIPadding.PaddingLeft = UDim.new(0, 2)
-	UIPadding.Parent = ScrollingFrame
+	local ui_padding = Instance.new("UIPadding")
+	ui_padding.PaddingTop = dim(0, 5)
+	ui_padding.PaddingLeft = dim(0, 2)
+	ui_padding.Parent = scrolling_frame
 	
-	local CLSearchFrame = Instance.new("Frame")
-	CLSearchFrame.Name = "SearchFrame"
-	CLSearchFrame.LayoutOrder = -1
-	CLSearchFrame.Size = UDim2.new(1, -10, 0, 20)
-	CLSearchFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	CLSearchFrame.BackgroundTransparency = 0.5
-	CLSearchFrame.BorderSizePixel = 0
-	CLSearchFrame.Parent = ScrollingFrame
+	local cl_search_frame = Instance.new("Frame")
+	cl_search_frame.Name = "SearchFrame"
+	cl_search_frame.LayoutOrder = -1
+	cl_search_frame.Size = dim2(1, -10, 0, 20)
+	cl_search_frame.BackgroundColor3 = rgb(30, 30, 30)
+	cl_search_frame.BackgroundTransparency = 0.5
+	cl_search_frame.BorderSizePixel = 0
+	cl_search_frame.Parent = scrolling_frame
 	
-	local CLSearchCorner = Instance.new("UICorner")
-	CLSearchCorner.CornerRadius = UDim.new(0, 6)
-	CLSearchCorner.Parent = CLSearchFrame
+	local cl_search_corner = Instance.new("UICorner")
+	cl_search_corner.CornerRadius = dim(0, 6)
+	cl_search_corner.Parent = cl_search_frame
 	
-	local CLSearchStroke = Instance.new("UIStroke")
-	CLSearchStroke.Color = Color3.fromRGB(60, 60, 60)
-	CLSearchStroke.Thickness = 1
-	CLSearchStroke.Parent = CLSearchFrame
+	local cl_search_stroke = Instance.new("UIStroke")
+	cl_search_stroke.Color = rgb(60, 60, 60)
+	cl_search_stroke.Thickness = 1
+	cl_search_stroke.Parent = cl_search_frame
 	
-	local CLSearchInput = Instance.new("TextBox")
-	CLSearchInput.Name = "Input"
-	CLSearchInput.Size = UDim2.new(1, -10, 1, 0)
-	CLSearchInput.Position = UDim2.new(0, 10, 0, 0)
-	CLSearchInput.BackgroundTransparency = 1
-	CLSearchInput.Text = ""
-	CLSearchInput.PlaceholderText = "Search commands..."
-	CLSearchInput.TextColor3 = Color3.fromRGB(220, 220, 220)
-	CLSearchInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
-	CLSearchInput.TextSize = 12
-	CLSearchInput.Font = Enum.Font.Gotham
-	CLSearchInput.TextXAlignment = Enum.TextXAlignment.Left
-	CLSearchInput.Parent = CLSearchFrame
+	local cl_search_input = Instance.new("TextBox")
+	cl_search_input.Name = "Input"
+	cl_search_input.Size = dim2(1, -10, 1, 0)
+	cl_search_input.Position = dim2(0, 10, 0, 0)
+	cl_search_input.BackgroundTransparency = 1
+	cl_search_input.Text = ""
+	cl_search_input.PlaceholderText = "Search commands..."
+	cl_search_input.TextColor3 = rgb(220, 220, 220)
+	cl_search_input.PlaceholderColor3 = rgb(120, 120, 120)
+	cl_search_input.TextSize = 12
+	cl_search_input.Font = Enum.Font.Gotham
+	cl_search_input.TextXAlignment = Enum.TextXAlignment.Left
+	cl_search_input.Parent = cl_search_frame
 	
-	self.CommandListHolder = CommandListHolder
-	self.CommandListFrame = CommandListFrame
-	self.CLShadow = CLShadow
-	self.CLScale = CLScale
-	self.ScrollingFrame = ScrollingFrame
-	self.CLSearchInput = CLSearchInput
+	self.command_list_holder = command_list_holder
+	self.command_list_frame = command_list_frame
+	self.cl_shadow = cl_shadow
+	self.cl_scale = cl_scale
+	self.scrolling_frame = scrolling_frame
+	self.cl_search_input = cl_search_input
 	
-	CLSearchInput:GetPropertyChangedSignal("Text"):Connect(function()
-		local query = CLSearchInput.Text:lower()
-		for _, child in ipairs(ScrollingFrame:GetChildren()) do
+	cl_search_input:GetPropertyChangedSignal("Text"):Connect(function()
+		local query = cl_search_input.Text:lower()
+		for _, child in ipairs(scrolling_frame:GetChildren()) do
 			if child:IsA("Frame") and child.Name ~= "SearchFrame" then
 				if child.Name:lower():find(query) then
 					child.Visible = true
@@ -859,114 +738,235 @@ function Library:CreateCommandList()
 		end
 	end)
 	
-	self:PopulateCommandList()
+	self:populate_command_list()
 end
 
-function Library:PopulateCommandList()
-	if not self.ScrollingFrame then return end
+function library:populate_command_list()
+	if not self.scrolling_frame then return end
 	
-	for _, child in ipairs(self.ScrollingFrame:GetChildren()) do
+	for _, child in ipairs(self.scrolling_frame:GetChildren()) do
 		if child:IsA("Frame") and child.Name ~= "SearchFrame" then 
 			child:Destroy() 
 		end
 	end
 	
-	for _, cmd in ipairs(self.Commands) do
+	for _, cmd in ipairs(self.commands) do
 		local entry = Instance.new("Frame")
-		entry.Name = cmd.Name
-		entry.Size = UDim2.new(1, 0, 0, 40)
+		entry.Name = cmd.name
+		entry.Size = dim2(1, 0, 0, 40)
 		entry.BackgroundTransparency = 1
-		entry.Parent = self.ScrollingFrame
+		entry.Parent = self.scrolling_frame
 		
-		local interactBtn = Instance.new("TextButton")
-		interactBtn.Name = "InteractBtn"
-		interactBtn.Size = UDim2.new(1, 0, 1, 0)
-		interactBtn.BackgroundTransparency = 1
-		interactBtn.Text = ""
-		interactBtn.Parent = entry
-		
-		local nameLabel = Instance.new("TextLabel")
-		nameLabel.Name = "CmdName"
-		nameLabel.Size = UDim2.new(1, 0, 0, 20)
-		nameLabel.Position = UDim2.new(0, 0, 0, 5)
-		nameLabel.BackgroundTransparency = 1
-		nameLabel.Text = string.format("%s%s", self.Prefix, cmd.Name)
-		nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-		nameLabel.TextTransparency = 0.1
-		nameLabel.TextSize = 16
-		nameLabel.Font = Enum.Font.GothamMedium
-		nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-		nameLabel.Parent = entry
-		
-		local descLabel = Instance.new("TextLabel")
-		descLabel.Name = "CmdDesc"
-		descLabel.Size = UDim2.new(1, 0, 0, 15)
-		descLabel.Position = UDim2.new(0, 0, 0, 22)
-		descLabel.BackgroundTransparency = 1
-		
-		local argText = cmd.ArgsDisplay or ""
-		if argText ~= "" then
-			descLabel.Text = string.format("%s - %s", argText, cmd.Desc)
+		if not cmd.args_display or cmd.args_display == "" then
+			local cmd_text = Instance.new("TextButton")
+			cmd_text.Name = "CmdLabel"
+			cmd_text.Size = dim2(1, 0, 0, 20)
+			cmd_text.Position = dim2(0, 0, 0, 10)
+			cmd_text.AnchorPoint = vec2(0, 0.5)
+			cmd_text.BackgroundTransparency = 1
+			cmd_text.Text = string.format("%s%s", self.prefix, cmd.name)
+			cmd_text.TextColor3 = rgb(255, 255, 255)
+			cmd_text.TextTransparency = 0.3
+			cmd_text.TextSize = 16
+			cmd_text.Font = Enum.Font.GothamMedium
+			cmd_text.TextXAlignment = Enum.TextXAlignment.Left
+			cmd_text.AutoButtonColor = false
+			cmd_text.Parent = entry
+
+			local cmd_scale = Instance.new("UIScale")
+			cmd_scale.Parent = cmd_text
+			
+			cmd_text.MouseEnter:Connect(function()
+				tween_service:Create(cmd_text, TweenInfo.new(0.2), { TextTransparency = 0.1 }):Play()
+			end)
+			cmd_text.MouseLeave:Connect(function()
+				tween_service:Create(cmd_text, TweenInfo.new(0.2), { TextTransparency = 0.3 }):Play()
+			end)
+
+			cmd_text.MouseButton1Click:Connect(function()
+				tween_service:Create(cmd_scale, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Scale = 0.9 }):Play()
+				tween_service:Create(cmd_text, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = 0 }):Play()
+				
+				task.delay(0.1, function()
+					tween_service:Create(cmd_scale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+					tween_service:Create(cmd_text, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { TextTransparency = 0.1 }):Play()
+				end)
+				
+				self:run_command(self.prefix .. cmd.name)
+			end)
 		else
-			descLabel.Text = cmd.Desc
+			local cmd_container = Instance.new("Frame")
+			cmd_container.Name = "CmdContainer"
+			cmd_container.Size = dim2(1, 0, 0, 20)
+			cmd_container.Position = dim2(0, 0, 0, 10)
+			cmd_container.AnchorPoint = vec2(0, 0.5)
+			cmd_container.BackgroundTransparency = 1
+			cmd_container.Parent = entry
+			
+			local ui_layout = Instance.new("UIListLayout")
+			ui_layout.FillDirection = Enum.FillDirection.Horizontal
+			ui_layout.SortOrder = Enum.SortOrder.LayoutOrder
+			ui_layout.Padding = dim(0, 4)
+			ui_layout.Parent = cmd_container
+
+			local name_label = Instance.new("TextButton")
+			name_label.Name = "CmdLabel"
+			name_label.BackgroundTransparency = 1
+			name_label.Text = string.format("%s%s", self.prefix, cmd.name)
+			name_label.TextColor3 = rgb(255, 255, 255)
+			name_label.TextTransparency = 0.3
+			name_label.TextSize = 16
+			name_label.Font = Enum.Font.GothamMedium
+			name_label.AutomaticSize = Enum.AutomaticSize.X
+			name_label.Size = dim2(0, 0, 1, 0)
+			name_label.TextXAlignment = Enum.TextXAlignment.Left
+			name_label.Parent = cmd_container
+			
+			local args_container = Instance.new("Frame")
+			args_container.Name = "ArgsContainer"
+			args_container.BackgroundTransparency = 1
+			args_container.AutomaticSize = Enum.AutomaticSize.X
+			args_container.Size = dim2(0, 0, 1, 0)
+			args_container.Parent = cmd_container
+
+			local args_layout = Instance.new("UIListLayout")
+			args_layout.FillDirection = Enum.FillDirection.Horizontal
+			args_layout.SortOrder = Enum.SortOrder.LayoutOrder
+			args_layout.Padding = dim(0, 0)
+			args_layout.Parent = args_container
+
+			local open_bracket = Instance.new("TextLabel")
+			open_bracket.Text = "["
+			open_bracket.BackgroundTransparency = 1
+			open_bracket.TextColor3 = rgb(255, 255, 255)
+			open_bracket.TextTransparency = 0.3
+			open_bracket.TextSize = 16
+			open_bracket.Font = Enum.Font.GothamMedium
+			open_bracket.AutomaticSize = Enum.AutomaticSize.X
+			open_bracket.Size = dim2(0, 0, 1, 0)
+			open_bracket.Parent = args_container
+
+			local arg_box = Instance.new("TextBox")
+			arg_box.Name = "ArgBox"
+			arg_box.BackgroundTransparency = 1
+			arg_box.TextColor3 = rgb(255, 255, 255)
+			arg_box.TextTransparency = 0.3
+			arg_box.PlaceholderColor3 = rgb(255, 255, 255)
+			arg_box.TextSize = 16
+			arg_box.Font = Enum.Font.GothamMedium
+			arg_box.TextXAlignment = Enum.TextXAlignment.Center
+			arg_box.AutomaticSize = Enum.AutomaticSize.X
+			arg_box.Size = dim2(0, 4, 1, 0)
+			arg_box.ClearTextOnFocus = true
+			arg_box.ClipsDescendants = false
+			arg_box.Parent = args_container
+            
+			arg_box:GetPropertyChangedSignal("Text"):Connect(function()
+				if arg_box.Text == "" then
+					arg_box.Size = dim2(0, 4, 1, 0)
+				else
+					arg_box.Size = dim2(0, 0, 1, 0)
+				end
+			end)
+			
+			local close_bracket = Instance.new("TextLabel")
+			close_bracket.Text = "]"
+			close_bracket.BackgroundTransparency = 1
+			close_bracket.TextColor3 = rgb(255, 255, 255)
+			close_bracket.TextTransparency = 0.3
+			close_bracket.TextSize = 16
+			close_bracket.Font = Enum.Font.GothamMedium
+			close_bracket.AutomaticSize = Enum.AutomaticSize.X
+			close_bracket.Size = dim2(0, 0, 1, 0)
+			close_bracket.Parent = args_container
+			
+			name_label.MouseButton1Click:Connect(function()
+				arg_box:CaptureFocus()
+			end)
+
+			local placeholder = cmd.args_display
+			placeholder = placeholder:gsub("^%[", ""):gsub("%]$", ""):gsub("^<", ""):gsub(">$", "")
+			
+			arg_box.Text = ""
+			arg_box.PlaceholderText = placeholder
+			
+			arg_box.Focused:Connect(function()
+				arg_box.PlaceholderText = ""
+			end)
+			
+			arg_box.FocusLost:Connect(function(enter)
+				arg_box.PlaceholderText = placeholder
+				if enter then
+					local val = arg_box.Text
+					if val ~= "" then
+						val = val:gsub("^%[", ""):gsub("%]$", "")
+						self:run_command(self.prefix .. cmd.name .. " " .. val)
+						arg_box.Text = ""
+					end
+				else
+					arg_box.Text = ""
+				end
+			end)
 		end
 		
-		descLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-		descLabel.TextTransparency = 0.4
-		descLabel.TextSize = 12
-		descLabel.Font = Enum.Font.Gotham
-		descLabel.TextXAlignment = Enum.TextXAlignment.Left
-		descLabel.Parent = entry
+		local desc_label = Instance.new("TextLabel")
+		desc_label.Name = "CmdDesc"
+		desc_label.Size = dim2(1, 0, 0, 15)
+		desc_label.Position = dim2(0, 0, 0, 22)
+		desc_label.BackgroundTransparency = 1
 		
-		interactBtn.MouseButton1Click:Connect(function()
-			if self.InputBox then
-				self.InputBox.Text = self.Prefix .. cmd.Name .. " "
-				self.InputBox:CaptureFocus()
-				self.InputBox.CursorPosition = #self.InputBox.Text + 1
-				
-				toggleCmdBar(true)
-			end
-		end)
+		local alias_str = ""
+		if cmd.aliases and #cmd.aliases > 0 then
+			alias_str = " (Aliases: " .. table.concat(cmd.aliases, ", ") .. ")"
+		end
+		
+		desc_label.Text = cmd.desc .. alias_str
+		desc_label.TextColor3 = rgb(180, 180, 180)
+		desc_label.TextTransparency = 0.4
+		desc_label.TextSize = 12
+		desc_label.Font = Enum.Font.Gotham
+		desc_label.TextXAlignment = Enum.TextXAlignment.Left
+		desc_label.Parent = entry
 	end
 end
 
-function Library:ToggleCommandList(show)
-	if show == nil then show = not self.CommandListHolder.Visible end
+function library:toggle_command_list(show)
+	if show == nil then show = not self.command_list_holder.Visible end
 	
 	if show then
-		self.CommandListHolder.Visible = true
-		if self.CommandListFrame.GroupTransparency >= 0.9 then
-			self.CommandListFrame.GroupTransparency = 1
-			self.CLShadow.ImageTransparency = 1
-			self.CLScale.Scale = 0.9
+		self.command_list_holder.Visible = true
+		if self.command_list_frame.GroupTransparency >= 0.9 then
+			self.command_list_frame.GroupTransparency = 1
+			self.cl_shadow.ImageTransparency = 1
+			self.cl_scale.Scale = 0.9
 		end
 		
-		tween_service:Create(self.CommandListFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		tween_service:Create(self.command_list_frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 			GroupTransparency = 0
 		}):Play()
-		tween_service:Create(self.CLShadow, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		tween_service:Create(self.cl_shadow, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			ImageTransparency = 0.8
 		}):Play()
-		tween_service:Create(self.CLScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		tween_service:Create(self.cl_scale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 			Scale = 1
 		}):Play()
 	else
-		tween_service:Create(self.CommandListFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		tween_service:Create(self.command_list_frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 			GroupTransparency = 1
 		}):Play()
-		tween_service:Create(self.CLShadow, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		tween_service:Create(self.cl_shadow, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 			ImageTransparency = 1
 		}):Play()
-		tween_service:Create(self.CLScale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		tween_service:Create(self.cl_scale, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 			Scale = 0.9
 		}):Play()
 		
 		task.delay(0.2, function()
-			if self.CommandListFrame.GroupTransparency >= 0.9 then
-				self.CommandListHolder.Visible = false
+			if self.command_list_frame.GroupTransparency >= 0.9 then
+				self.command_list_holder.Visible = false
 			end
 		end)
 	end
 end
 
-return Library
+return library
