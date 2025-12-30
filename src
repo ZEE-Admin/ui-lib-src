@@ -554,15 +554,17 @@ function library:create_command_bar(prefix)
 			local text = input_box.Text
 			if text ~= "" then
 				self:run_command(self.prefix .. text)
-				input_box.Text = ""
-				toggle_cmd_bar(false)
 			end
 		end
+		input_box.Text = ""
+		toggle_cmd_bar(false)
 	end)
 	
 	uis.InputBegan:Connect(function(input, gpe)
 		if input.KeyCode == self.toggle_key and not gpe then
 			toggle_cmd_bar()
+		elseif input.KeyCode == Enum.KeyCode.Escape and is_visible then
+			toggle_cmd_bar(false)
 		elseif is_visible and input.KeyCode == Enum.KeyCode.Tab then
 			if current_match and current_suggestion_full ~= "" then
 				input_box.Text = current_suggestion_full
