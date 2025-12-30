@@ -155,9 +155,11 @@ function library:register_default_commands()
 		-- Remove quotes if present
 		key_name = key_name:gsub('"', ''):gsub("'", "")
 		
-		local key = Enum.KeyCode[key_name]
+		local success, key = pcall(function()
+			return Enum.KeyCode[key_name]
+		end)
 		
-		if not key then
+		if not success or not key then
 			-- Try to find key case-insensitive
 			for _, k in ipairs(Enum.KeyCode:GetEnumItems()) do
 				if k.Name:lower() == key_name:lower() then
@@ -183,6 +185,14 @@ function library:register_default_commands()
 			self:notify("Bind set to " .. key.Name)
 			if self.auto_config then self:save_config() end
 			
+			-- Update command description to show new key
+			for _, cmd in ipairs(self.commands) do
+				if cmd.name == "bind" then
+					cmd.desc = "Change command bar toggle key (Current: " .. key.Name .. ")"
+					break
+				end
+			end
+			
 			if self.scrolling_frame then
 				self:populate_command_list()
 			end
@@ -198,6 +208,29 @@ function library:register_default_commands()
 			game:GetService("TeleportService"):Teleport(game.PlaceId, lp)
 		else
 			game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, lp)
+		end
+	end, {"rj"})
+	
+	self:add_command("shop", "", "Teleport to the shop", function()
+		local shop = workspace:FindFirstChild("Ignored") and workspace.Ignored:FindFirstChild("Shop")
+		if not shop then
+			-- Try finding it recursively or by name in workspace
+			shop = workspace:FindFirstChild("Shop", true)
+		end
+		
+		if shop then
+			-- Try to find a part to teleport to
+			local target = shop:IsA("BasePart") and shop or shop:FindFirstChildWhichIsA("BasePart", true)
+			if target then
+				if lp.Character and lp.Character:FindFirstChild("HumanoidRootPart") then
+					lp.Character.HumanoidRootPart.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+					self:notify("Teleported to Shop")
+				end
+			else
+				self:notify("Shop found but no teleport target")
+			end
+		else
+			self:notify("Shop not found")
 		end
 	end)
 	
