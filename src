@@ -9,8 +9,11 @@ local Library = {}
 Library.__index = Library
 Library.Commands = {}
 
-function Library.new()
+function Library.new(name, autoConfig)
 	local self = setmetatable({}, Library)
+	self.Name = name or "UI Lib"
+	self.AutoConfig = autoConfig
+	self.StartTime = tick()
 	self.ScreenGui = nil
 	self.NotificationContainer = nil
 	self.CmdBarFrame = nil
